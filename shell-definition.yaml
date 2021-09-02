@@ -84,7 +84,7 @@ node_types:
           Enable SNMP:
             description: If set to True and SNMP isn’t enabled yet in the device the Shell will automatically enable SNMP in the device when Autoload command is called. SNMP must be enabled on the device for the Autoload command to run successfully. True by default.
             type: boolean
-            default: true
+            default: false
           Disable SNMP:
             description: If set to True SNMP will be disabled automatically by the Shell after the Autoload command execution is completed. False by default.
             type: boolean

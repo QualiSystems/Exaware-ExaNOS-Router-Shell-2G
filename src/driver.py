@@ -22,10 +22,15 @@ from cloudshell.networking.exaware.cli.exaware_cli_handler import ExawareCli
 from cloudshell.networking.exaware.flows.exaware_autoload_flow import (
     ExawareSnmpAutoloadFlow as AutoloadFlow,
 )
+from cloudshell.networking.exaware.flows.exaware_configuration_flow import (
+    ExawareConfigurationFlow as ConfigurationFlow,
+)
 from cloudshell.networking.exaware.flows.exaware_run_command_flow import (
     ExawareRunCommandFlow as CommandFlow,
 )
-from cloudshell.networking.exaware.flows.exaware_state_flow import ExawareStateFlow as StateFlow
+from cloudshell.networking.exaware.flows.exaware_state_flow import (
+    ExawareStateFlow as StateFlow,
+)
 from cloudshell.networking.exaware.snmp.exaware_snmp_handler import (
     ExawareSnmpHandler as SNMPHandler,
 )
@@ -197,7 +202,34 @@ class ExawareExaNOSShellDriver(
         :param vrf_management_name: VRF management Name
         :return str saved configuration file name
         """
-        pass
+        with LoggingSessionContext(context) as logger:
+            api = CloudShellSessionContext(context).get_api()
+
+            resource_config = NetworkingResourceConfig.from_context(
+                shell_name=self.SHELL_NAME,
+                supported_os=self.SUPPORTED_OS,
+                context=context,
+                api=api,
+            )
+
+            if not configuration_type:
+                configuration_type = "running"
+
+            if not vrf_management_name:
+                vrf_management_name = resource_config.vrf_management_name
+
+            cli_handler = self._cli.get_cli_handler(resource_config, logger)
+            configuration_flow = ConfigurationFlow(
+                cli_handler=cli_handler, logger=logger, resource_config=resource_config
+            )
+            logger.info("Save started")
+            response = configuration_flow.save(
+                folder_path=folder_path,
+                configuration_type=configuration_type,
+                vrf_management_name=vrf_management_name,
+            )
+            logger.info("Save completed")
+            return response
 
     @GlobalLock.lock
     def restore(
@@ -216,7 +248,37 @@ class ExawareExaNOSShellDriver(
         :param restore_method: append or override methods
         :param vrf_management_name: VRF management Name
         """
-        pass
+        with LoggingSessionContext(context) as logger:
+            api = CloudShellSessionContext(context).get_api()
+
+            resource_config = NetworkingResourceConfig.from_context(
+                shell_name=self.SHELL_NAME,
+                supported_os=self.SUPPORTED_OS,
+                context=context,
+                api=api,
+            )
+
+            if not configuration_type:
+                configuration_type = "running"
+
+            if not restore_method:
+                restore_method = "override"
+
+            if not vrf_management_name:
+                vrf_management_name = resource_config.vrf_management_name
+
+            cli_handler = self._cli.get_cli_handler(resource_config, logger)
+            configuration_flow = ConfigurationFlow(
+                cli_handler=cli_handler, logger=logger, resource_config=resource_config
+            )
+            logger.info("Restore started")
+            configuration_flow.restore(
+                path=path,
+                restore_method=restore_method,
+                configuration_type=configuration_type,
+                vrf_management_name=vrf_management_name,
+            )
+            logger.info("Restore completed")
 
     @GlobalLock.lock
     def load_firmware(
