@@ -7,6 +7,7 @@ from cloudshell.shell.core.driver_context import (
     ResourceCommandContext,
 )
 from cloudshell.shell.core.driver_utils import GlobalLock
+from cloudshell.shell.core.orchestration_save_restore import OrchestrationSaveRestore
 from cloudshell.shell.core.resource_driver_interface import ResourceDriverInterface
 from cloudshell.shell.core.session.cloudshell_session import CloudShellSessionContext
 from cloudshell.shell.core.session.logging_session import LoggingSessionContext
@@ -292,10 +293,6 @@ class ExawareExaNOSShellDriver(
         """
         pass
 
-    def shutdown(self, context):
-        """Shutdown device."""
-        pass
-
     def orchestration_save(
         self, context: ResourceCommandContext, mode: str, custom_params: str
     ) -> str:
@@ -306,7 +303,33 @@ class ExawareExaNOSShellDriver(
         :param custom_params: json with custom save parameters
         :return str response: response json
         """
-        pass
+        with LoggingSessionContext(context) as logger:
+            if not mode:
+                mode = "shallow"
+
+            api = CloudShellSessionContext(context).get_api()
+
+            resource_config = NetworkingResourceConfig.from_context(
+                shell_name=self.SHELL_NAME,
+                supported_os=self.SUPPORTED_OS,
+                context=context,
+                api=api,
+            )
+
+            cli_handler = self._cli.get_cli_handler(resource_config, logger)
+            configuration_flow = ConfigurationFlow(
+                cli_handler=cli_handler, logger=logger, resource_config=resource_config
+            )
+
+            logger.info("Orchestration save started")
+            response = configuration_flow.orchestration_save(
+                mode=mode, custom_params=custom_params
+            )
+            response_json = OrchestrationSaveRestore(
+                logger, resource_config.name
+            ).prepare_orchestration_save_result(response)
+            logger.info("Orchestration save completed")
+            return response_json
 
     def orchestration_restore(
         self,
@@ -320,6 +343,30 @@ class ExawareExaNOSShellDriver(
         :param saved_artifact_info: OrchestrationSavedArtifactInfo json
         :param custom_params: json with custom restore parameters
         """
+        with LoggingSessionContext(context) as logger:
+            api = CloudShellSessionContext(context).get_api()
+
+            resource_config = NetworkingResourceConfig.from_context(
+                shell_name=self.SHELL_NAME,
+                supported_os=self.SUPPORTED_OS,
+                context=context,
+                api=api,
+            )
+
+            cli_handler = self._cli.get_cli_handler(resource_config, logger)
+            configuration_flow = ConfigurationFlow(
+                cli_handler=cli_handler, logger=logger, resource_config=resource_config
+            )
+
+            logger.info("Orchestration restore started")
+            restore_params = OrchestrationSaveRestore(
+                logger, resource_config.name
+            ).parse_orchestration_save_result(saved_artifact_info)
+            configuration_flow.restore(**restore_params)
+            logger.info("Orchestration restore completed")
+
+    def shutdown(self, context):
+        """Shutdown device."""
         pass
 
     def cleanup(self):
